@@ -111,19 +111,48 @@ def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
         A non-empty string with outfit suggestions.
         If the wardrobe is empty, offer general styling advice for the item
         rather than raising an exception or returning an empty string.
-    TODO:
-        1. Check whether wardrobe['items'] is empty.
-        2. If empty: call the LLM with a prompt for general styling ideas
-           (what kinds of items pair well, what vibe it suits, etc.).
-        3. If not empty: format the wardrobe items into a prompt and ask
-           the LLM to suggest specific outfit combinations using the new item
-           and named pieces from the wardrobe.
-        4. Return the LLM's response as a string.
-
-    Before writing code, fill in the Tool 2 section of planning.md.
     """
-    # Replace this with your implementation
-    return ""
+    client = _get_groq_client()
+    items = wardrobe.get("items", [])
+
+    item_block = (
+        f"- Title: {new_item.get('title', '')}\n"
+        f"- Category: {new_item.get('category', '')}\n"
+        f"- Colors: {', '.join(new_item.get('colors', []))}\n"
+        f"- Style tags: {', '.join(new_item.get('style_tags', []))}\n"
+        f"- Description: {new_item.get('description', '')}"
+    )
+
+    if not items:
+        prompt = (
+            "You are a fashion stylist specializing in thrifted clothing.\n\n"
+            f"A user is considering buying this item:\n{item_block}\n\n"
+            "They don't have a saved wardrobe yet. Give them 1-2 general outfit ideas "
+            "for this piece — suggest what types of bottoms, shoes, or layers would pair "
+            "well with it, and describe the overall vibe each outfit creates. "
+            "Keep the tone casual and specific."
+        )
+    else:
+        wardrobe_lines = "\n".join(
+            f"- {item['name']} ({item.get('category', '')}, "
+            f"{', '.join(item.get('colors', []))})"
+            for item in items
+        )
+        prompt = (
+            "You are a fashion stylist specializing in thrifted clothing.\n\n"
+            f"A user is considering buying this item:\n{item_block}\n\n"
+            f"Here is what they already own:\n{wardrobe_lines}\n\n"
+            "Suggest 1-2 complete outfits combining the new item with specific pieces "
+            "from their wardrobe. Name each wardrobe piece you use. Describe the overall "
+            "vibe for each outfit. Keep the tone casual and specific."
+        )
+
+    response = client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7,
+    )
+    return response.choices[0].message.content
 
 
 # ── Tool 3: create_fit_card ───────────────────────────────────────────────────
