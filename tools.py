@@ -24,6 +24,7 @@ load_dotenv()
 
 # ── Groq client ───────────────────────────────────────────────────────────────
 
+
 def _get_groq_client():
     """Initialize and return a Groq client using GROQ_API_KEY from .env."""
     api_key = os.environ.get("GROQ_API_KEY")
@@ -35,6 +36,7 @@ def _get_groq_client():
 
 
 # ── Tool 1: search_listings ───────────────────────────────────────────────────
+
 
 def search_listings(
     description: str,
@@ -98,6 +100,7 @@ def search_listings(
 
 # ── Tool 2: suggest_outfit ────────────────────────────────────────────────────
 
+
 def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
     """
     Given a thrifted item and the user's wardrobe, suggest 1–2 complete outfits.
@@ -157,6 +160,7 @@ def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
 
 # ── Tool 3: create_fit_card ───────────────────────────────────────────────────
 
+
 def create_fit_card(outfit: str, new_item: dict) -> str:
     """
     Generate a short, shareable outfit caption for the thrifted find.
@@ -184,5 +188,27 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
 
     Before writing code, fill in the Tool 3 section of planning.md.
     """
-    # Replace this with your implementation
-    return ""
+    if not outfit or not outfit.strip():
+        return "Error: outfit description is missing or incomplete — cannot generate a fit card."
+
+    title = new_item.get("title", "")
+    price = new_item.get("price", "")
+    platform = new_item.get("platform", "")
+
+    prompt = (
+        f"You found this thrifted item: {title} for ${price} on {platform}.\n"
+        f"The suggested outfit: {outfit}\n\n"
+        f"Write a 2-4 sentence Instagram/TikTok OOTD caption that:\n"
+        f"- Feels casual and authentic, not like a product description\n"
+        f"- Mentions the item name, price, and platform once each\n"
+        f"- Captures the outfit vibe in specific terms\n"
+        f"Write only the caption, no hashtags, no preamble."
+    )
+
+    client = _get_groq_client()
+    response = client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.9,
+    )
+    return response.choices[0].message.content
