@@ -69,8 +69,31 @@ def search_listings(
 
     Before writing code, fill in the Tool 1 section of planning.md.
     """
-    # Replace this with your implementation
-    return []
+    listings = load_listings()
+
+    if max_price is not None:
+        listings = [item for item in listings if item["price"] <= max_price]
+    if size is not None:
+        size_lowerCase = size.lower()
+        listings = [item for item in listings if size_lowerCase in item["size"].lower()]
+
+    keywords = set(description.lower().split())
+
+    def _score(listing):
+        text_fields = [
+            listing.get("title", ""),
+            listing.get("description", ""),
+            listing.get("category", ""),
+            listing.get("brand", "") or "",
+        ]
+        tokens = set(" ".join(text_fields).lower().split())
+        tag_tokens = {tag.lower() for tag in listing.get("style_tags", [])}
+        color_tokens = {c.lower() for c in listing.get("colors", [])}
+        return len(keywords & (tokens | tag_tokens | color_tokens))
+
+    scored = [(score, item) for item in listings if (score := _score(item)) > 0]
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [item for _, item in scored]
 
 
 # ── Tool 2: suggest_outfit ────────────────────────────────────────────────────
@@ -88,7 +111,6 @@ def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
         A non-empty string with outfit suggestions.
         If the wardrobe is empty, offer general styling advice for the item
         rather than raising an exception or returning an empty string.
-
     TODO:
         1. Check whether wardrobe['items'] is empty.
         2. If empty: call the LLM with a prompt for general styling ideas
