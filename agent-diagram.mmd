@@ -1,0 +1,44 @@
+flowchart TD
+    U["User query\ndescription · size · max_price · wardrobe"]
+
+    U --> CHECK
+
+    subgraph LOOP["Planning loop (ReAct)"]
+        CHECK{"All params\npresent? (can be limited to just the description if there is no size or max price given)"}
+
+        CHECK -->|yes| T1
+        CHECK -->|no| MISSING["Missing params\n→ prompt user (handled on the client-side)"]
+
+        T1["search_listings()\ndescription, size, max_price → ranked listings"]
+        T2["suggest_outfit()\nnew_item, wardrobe → outfit string"]
+        T3["create_fit_card()\noutfit, new_item → OOTD-style caption"]
+
+        STATE[("Session state\n────────────\nlistings result\nnew_item\noutfit\nfit_card")]
+
+        T1 -->|"new_item"| T2
+        T2 -->|"outfit"| T3
+        T3 -->|"fit_card stored"| DONE["Session complete"]
+
+        T1 -.->|write| STATE
+        T2 -.->|write| STATE
+        T3 -.->|write| STATE
+
+        T1 -->|no results| ERR1["No results\n→ notify user"]
+        T2 -->|empty wardrobe| WARN2["Empty wardrobe\n→ general styling advice"]
+        WARN2 --> |proceed to next tooling without raising an exception or empty string| T3
+        T3 -->|fail after 20 tries| ERR3["Session error\n→ return error msg"]
+    end
+
+    DONE --> OUT["Output to user\nfit card + outfit suggestion"]
+
+    style STATE fill:#EEEDFE,stroke:#534AB7,color:#3C3489
+    style ERR1  fill:#FCEBEB,stroke:#A32D2D,color:#791F1F
+    style ERR3  fill:#FCEBEB,stroke:#A32D2D,color:#791F1F
+    style WARN2 fill:#FAEEDA,stroke:#854F0B,color:#633806
+    style T1    fill:#E1F5EE,stroke:#0F6E56,color:#085041
+    style T2    fill:#E1F5EE,stroke:#0F6E56,color:#085041
+    style T3    fill:#E1F5EE,stroke:#0F6E56,color:#085041
+    style OUT   fill:#EEEDFE,stroke:#534AB7,color:#3C3489
+    style DONE  fill:#F1EFE8,stroke:#5F5E5A,color:#444441
+    style CHECK fill:#F1EFE8,stroke:#5F5E5A,color:#444441
+    style U     fill:#F1EFE8,stroke:#5F5E5A,color:#444441

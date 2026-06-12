@@ -103,15 +103,7 @@ For each tool, describe the specific failure mode you're handling and what the a
 
 ## Architecture
 
-<!-- Draw a diagram of your agent showing how the components connect:
-     User input → Planning Loop → Tools (search_listings, suggest_outfit, create_fit_card)
-                                                                          ↕
-                                                                   State / Session
-     Show what triggers each tool, how state flows between them, and where error paths branch off.
-     ASCII art, a Mermaid diagram (https://mermaid.js.org/syntax/flowchart.html), or an embedded
-     sketch are all fine. You'll share this diagram with an AI tool when asking it to implement
-     the planning loop and each individual tool. -->
-
+Please refer to ``agent-diagram.mmd`` for the architecture diagram.
 ---
 
 ## AI Tool Plan
@@ -129,8 +121,13 @@ For each tool, describe the specific failure mode you're handling and what the a
 
 **Milestone 3 — Individual tool implementations:**
 
+
+          Claude Code will be used to produce the tool implementations. For context, it will receive the description of the tools implementation on ``planning.md`` and will look for "### Tool 1: search_listings". Then, it will read the ``agent-diagram.mmd`` file to get the high-level idea of each tools implementation and how they connect with each other. Additionally, it will receive the tools.py file for it to read the documentation of each tooling and the more minute details of how it should methodically write the code. The code expected to be produce are the toolings that properly align with how the tool's specs, diagram, and documentation reflected it to be. Additionally, the produced code should then be able to pass a pre-written test suite for each tooling.  
+     
+
 **Milestone 4 — Planning loop and state management:**
 
+          Claude Code will be used to implement the agent loop and the state management. For context, it will receive ``planning.md`` and it will specifically look for the labels "## Planning Loop" and "## State Management". Then, it will read the ``agent-diagram.mmd`` file to understand the agents action at each step. Additionally, it will receive the agent.py file for it to read the documentation of the run_agent method and which was the more detailed explanation of the agent's entry point. The code expected to be produce should properly align with how the given specs, diagram, and documentation reflects the agents behaviors and procedures. Additionally, the produced code should then be able to pass a pre-written test suite for the agents functionality.  
 ---
 
 ## A Complete Interaction (Step by Step)
@@ -141,12 +138,19 @@ Write out what a full user interaction looks like from start to finish — tool 
 
 **Step 1:**
 <!-- What does the agent do first? Which tool is called? With what input? -->
+First, the age will receive the user query as the description and parse any information on the size and cost of the item. In this case, the agent will look at the user query, see that they want a max price of "under $30". However, since no size is specified, it will be marked as None. Then, the agent will take the description and max_price as parameters to then call search_listings(). 
+
 
 **Step 2:**
 <!-- What happens next? What was returned from step 1? What tool is called now? -->
+So, if search_listings() returns an empty list (i.e, the agent couldn't find an item matching the user's query), then the agent will end the loop early and return a message to the user saying that it could not find an item matching its query. Otherwise, if search_listings() were to successfully a return a list with new_items, the 1st ranked new_item of that list, based on the highest score, will be written to the session state for the agent to refer to. 
 
 **Step 3:**
 <!-- Continue until the full interaction is complete -->
+If that new_item exists in the session state, the agent will now call suggest_outfit() with parameters being the new_item from the session state and the user's wardrobe, which could be empty. If the wardrobe is empty, the agent itself will offer general styling advice without stopping the loop and proceed to the next step with the outfit written to the session state. If there is a wardrobe, the outfit will be made and also be written to the session state. 
+
+Lastly, once the outfit is generated, the agent will now call the last tool, create_fit_card(), which will take in the outfit and the new_item from the session state. The agent will write the fit_card With specific instructions to write it in a OOTD fashion. If the agent fails to write the fit_card after 20 iterations, it will return with a session error that is displayed to the client.  
 
 **Final output to user:**
 <!-- What does the user actually see at the end? -->
+Upon successfully generating the fit_card and storing it into the session state, the session will be marked as complete and the agent will end it's loop. The final output should include the information from the session state added into all of the designated client rows.  
