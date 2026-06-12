@@ -15,21 +15,25 @@ You must have at least 3 tools. The three required tools are listed — add any 
 ### Tool 1: search_listings
 
 **What it does:**
-<!-- Describe what this tool does in 1–2 sentences -->
-search_listings will find the clothes that most fit the given characteristics of the desired clothes description, size, and max price. 
+`search_listings` scores every listing in `data/listings.json` by keyword overlap with the user's description, then filters by optional size and max price. It returns the matching listings sorted by relevance score (highest first), or an empty list if nothing matches.
+
 **Input parameters:**
-<!-- List each parameter, its type, and what it represents -->
-- `description` (str): This parameter is the overall description of the requested item. 
-- `size` (str): This parameter is the size that is extracted from the description. This parameter will be parsed by the LLM.
-- `max_price` (float): This parameter is the size that is extracted from the description. This parameter will also be parsed by the LLM.
+- `description` (str): Freeform keywords describing the item (e.g. "vintage graphic tee"). Tokenized on whitespace and matched case-insensitively.
+- `size` (str | None): Size to filter by. Matched as a case-insensitive substring of the listing's size field, so "M" matches "S/M" and "xl" matches "XL (oversized)". Pass `None` to skip size filtering.
+- `max_price` (float | None): Maximum price (inclusive). Pass `None` to skip price filtering.
 
 **What it returns:**
-<!-- Describe the return value — what fields does a result contain? -->
-This tool will return an empty list if there seems to be no clothes that match the characteristics. If there are clothes that exist in the mock dataset that match the user's description, the top listings of the clothes, which are sorted based on highest score, will be returned.
+A list of listing dicts, each with fields: `id`, `title`, `description`, `category`, `style_tags` (list), `size`, `condition`, `price` (float), `colors` (list), `brand`, `platform`. Results are sorted by relevance score descending; listings with a score of 0 are excluded. Returns `[]` if nothing matches — never raises.
+
+Scoring algorithm: tokenize `description` into a keyword set, then count how many tokens appear in any of a listing's text fields: `title`, `description`, `category`, `brand` (joined and split on whitespace) plus `style_tags` and `colors` (list values, lowercased). Score = number of matching unique tokens.
+
+This scoring algorithm is simple and fast. However, this algorithm doesn't account for typos, semantic understanding, and unbroken ties. 
+
+Since this is a project with a small, curated data set, this scoring algorithm is a good start. But as we scale, approaches like using BM25 for text ranking or embedded-based search should be considered. 
+
 
 **What happens if it fails or returns nothing:**
-<!-- What should the agent do if no listings match? -->
-If the agent observes that there are no listings that match, the agent will stop looping on the task and will return a message to the user, letting it know that the requested item could not be found. Though this doesn't seem like it's implemented on the client-facing side so this will be implemented more in detail (i'll come with something later)
+If the returned list is empty, the agent stops the loop early and returns a message to the user saying no matching items were found. The tool itself never raises an exception and the agent loop is responsible for detecting the empty result.
 ---
 
 ### Tool 2: suggest_outfit
