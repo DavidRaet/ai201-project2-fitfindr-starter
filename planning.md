@@ -69,7 +69,6 @@ If the wardrobe is empty, general styling advice is offered and the loop continu
 ---
 
 ### Tool 3: create_fit_card
-
 **What it does:**
 <!-- Describe what this tool does in 1–2 sentences -->
 create_fit_card will take in the outfit suggested, which will be given from the suggest_outfit tool, and the new_item, which was the first item from the top listings given by search_listings. 
@@ -116,6 +115,28 @@ For each tool, describe the specific failure mode you're handling and what the a
 | search_listings | No results match the query | The agent will return a message to the user, letting it know that the requested item could not be found. |
 | suggest_outfit | Wardrobe is empty | Offer general styling advice with the new_item.  |
 | create_fit_card | Outfit input is missing or incomplete | The agent will end and return the error message sent for that session |
+
+---
+
+## Query Parsing
+
+**Approach: regex (no LLM call)**
+
+Before calling `search_listings`, `run_agent` calls `_parse_query(query)` to extract three fields from the raw user input:
+
+| Field | Pattern | Example input | Extracted value |
+|-------|---------|--------------|----------------|
+| `max_price` | `under \$?(\d+(?:\.\d+)?)` | "under $30" | `30.0` |
+| `size` | `\bsize\s+([A-Za-z0-9\/]+)` | "size M" | `"M"` |
+| `description` | original query minus price/size tokens | "vintage graphic tee under $30, size M" | `"vintage graphic tee"` |
+
+**Why regex instead of LLM:**
+- Deterministic and fully testable without API calls
+- Regex covers all patterns in the example interactions
+- Avoids an extra round-trip latency before the first tool call
+- The field set is small and well-structured; LLM parsing would add complexity for no gain at this scale
+
+**Return value:** `{"description": str, "size": str | None, "max_price": float | None}`
 
 ---
 
