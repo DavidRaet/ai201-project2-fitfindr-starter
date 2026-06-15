@@ -69,19 +69,29 @@ If the wardrobe is empty, general styling advice is offered and the loop continu
 ---
 
 ### Tool 3: create_fit_card
+
 **What it does:**
-<!-- Describe what this tool does in 1–2 sentences -->
-create_fit_card will take in the outfit suggested, which will be given from the suggest_outfit tool, and the new_item, which was the first item from the top listings given by search_listings. 
+`create_fit_card` takes an outfit suggestion string and the thrifted item dict, then calls the Groq LLM to generate a 2–4 sentence OOTD-style caption suitable for Instagram or TikTok. It guards against empty/whitespace-only outfit input before making any API call.
+
 **Input parameters:**
-<!-- List each parameter, its type, and what it represents -->
-- `outfit` (str): The description of the suggested outfit given from the suggest_outfit tool.
-- `new_item` (dict): The top item from the result list of search_listings.  
+- `outfit` (str): The outfit suggestion returned by `suggest_outfit`. If empty or whitespace-only, the tool returns a descriptive error string immediately without calling the LLM.
+- `new_item` (dict): The top listing dict from `search_listings`. Used to extract `title`, `price`, and `platform` for the caption.
+
 **What it returns:**
-<!-- Describe the return value -->
-create_fit_card will return a string of paragraph length that represents a Instagram/TikTok styled caption, which should give off an informal and authentic vibe similar to an (Outfit-Of-The-Day) type of post rather than a product description. Additionally, for everytime there is a different input, it should output a unique description that shouldn't be similar to previous ones.  
+The raw string from `response.choices[0].message.content` is a 2–4 sentence caption that mentions the item name, price, and platform once each, captures the outfit vibe in specific terms, and reads like an authentic OOTD post rather than a product description. On empty `outfit` input, returns a descriptive error string instead of raising an exception.
+
+**Prompt design:**
+The prompt states the thrifted item (`title`, `price`, `platform`) and the full outfit suggestion, then instructs the LLM to write only the caption (no hashtags, no preamble) matching the style guidelines above.
+
+**Model and temperature:**
+- Model: `llama-3.1-8b-instant`.
+- Temperature: `0.9`, which is higher than `suggest_outfit` (0.7) to ensure the caption sounds different across runs.
+
+**Testing approach:**
+Mock `tools._get_groq_client` with `unittest.mock.patch`. Tests validate: returns error string on empty/whitespace `outfit` (LLM not called); returns mock content verbatim on valid input; LLM called exactly once per invocation.
+
 **What happens if it fails or returns nothing:**
-<!-- What should the agent do if the outfit data is incomplete? -->
-First, allow the agent to run about 20 iterations of the loop to make the caption. If it's the case that the agent fails to make a caption by then, the agent can then set the error message, and close the loop. 
+The tool itself is a single-shot call and it does not retry internally. Retry logic lives in `run_agent` in `agent.py`: if `create_fit_card` raises an exception, `run_agent` retries up to 20 times. After all retries are exhausted, `run_agent` sets `session["error"]` and returns early.
 ---
 
 ### Additional Tools (if any)
@@ -92,9 +102,18 @@ First, allow the agent to run about 20 iterations of the loop to make the captio
 
 ## Planning Loop
 
-**How does your agent decide which tool to call next?**
-<!-- Describe the logic your planning loop uses. What does it look at? What conditions change its behavior? How does it know when it's done? -->
-The underlying pattern at each stage in the planning loop is that it can only proceed to the next step if it's received the adequate information to call the next tool. For example, when we parse the user's query to extract a description, size, and max_price, and the wardrobe, the agent then asks if it has all of those parameters. Then, if so proceeds to call the first tool, search_listings(). At each step in the planning loop, it will mirror this ReAct loop until it has finished or it hits a session error at any point in the planning loop. For the definition of finished, if the agent has been able to finish calling create_fit_card(), the last tool cool, with the resulting session successfully storing the fit_card, this will indicate the end of the session for the agent and it will stop looping. 
+**How does the agent decide which tool to call next?**
+
+The implementation is a **fixed sequential pipeline** and the tool order is always the same and is not determined at runtime. There is no dynamic replanning or observation-driven tool selection. The sequence is:
+
+1. `_parse_query` → 2. `search_listings` → 3. `suggest_outfit` → 4. `create_fit_card`
+
+Each step writes its result into the session dict; the next step reads from the session dict. The loop terminates in one of two ways:
+
+- **Early exit (error):** After `search_listings` returns an empty list, or after `create_fit_card` fails all 20 retry attempts and `session["error"]` is set and `run_agent` returns immediately.
+- **Normal completion:** After `create_fit_card` succeeds and `session["fit_card"]` is populated, `run_agent` returns the completed session.
+
+The 20-iteration cap in the spec refers to the retry loop around `create_fit_card` in `run_agent`, not to a replanning loop over all three tools.
 
 ---
 
@@ -110,11 +129,12 @@ The agent stores the information at each session in a dictionary, which will ser
 
 For each tool, describe the specific failure mode you're handling and what the agent does in response.
 
-| Tool | Failure mode | Agent response |
-|------|-------------|----------------|
-| search_listings | No results match the query | The agent will return a message to the user, letting it know that the requested item could not be found. |
-| suggest_outfit | Wardrobe is empty | Offer general styling advice with the new_item.  |
-| create_fit_card | Outfit input is missing or incomplete | The agent will end and return the error message sent for that session |
+| Tool / Layer | Failure mode | Response |
+|---|---|---|
+| `search_listings` | No results match the query | `run_agent` sets `session["error"]` with a user-facing message and returns early. |
+| `suggest_outfit` | Wardrobe is empty | Tool returns general styling advice for the item; no exception is raised and the loop continues to `create_fit_card`. |
+| `create_fit_card` | `outfit` is empty or whitespace-only | Tool returns a descriptive error string immediately and does NOT raise an exception. |
+| `run_agent` (wrapping `create_fit_card`) | LLM call raises an exception | Retries up to 20 times; if all attempts fail, sets `session["error"]` and returns early. |
 
 ---
 
@@ -160,13 +180,11 @@ Please refer to ``agent-diagram.mmd`` for the architecture diagram.
 
 **Milestone 3 — Individual tool implementations:**
 
-
-          Claude Code will be used to produce the tool implementations. For context, it will receive the description of the tools implementation on ``planning.md`` and will look for "### Tool 1: search_listings". Then, it will read the ``agent-diagram.mmd`` file to get the high-level idea of each tools implementation and how they connect with each other. Additionally, it will receive the tools.py file for it to read the documentation of each tooling and the more minute details of how it should methodically write the code. The code expected to be produce are the toolings that properly align with how the tool's specs, diagram, and documentation reflected it to be. Additionally, the produced code should then be able to pass a pre-written test suite for each tooling.  
-     
+Claude Code was used to produce the tool implementations. It received the tool specs from `planning.md` (the `### Tool 1–3` sections) and `agent-diagram.mmd` for the high-level flow, plus the docstrings in `tools.py` for method-level detail. The produced implementations were verified against the pre-written test suites in `tests/test_search_listings.py`, `tests/test_suggest_outfit.py`, and `tests/test_create_fit_card.py`.
 
 **Milestone 4 — Planning loop and state management:**
 
-          Claude Code will be used to implement the agent loop and the state management. For context, it will receive ``planning.md`` and it will specifically look for the labels "## Planning Loop" and "## State Management". Then, it will read the ``agent-diagram.mmd`` file to understand the agents action at each step. Additionally, it will receive the agent.py file for it to read the documentation of the run_agent method and which was the more detailed explanation of the agent's entry point. The code expected to be produce should properly align with how the given specs, diagram, and documentation reflects the agents behaviors and procedures. Additionally, the produced code should then be able to pass a pre-written test suite for the agents functionality.  
+Claude Code was used to implement `run_agent` in `agent.py`. It received the `## Planning Loop` and `## State Management` sections of `planning.md`, `agent-diagram.mmd` for the control-flow structure, and the `run_agent` docstring in `agent.py` for the step-by-step entry-point spec. The implementation was verified against the pre-written test suite in `tests/test_agent.py`.
 ---
 
 ## A Complete Interaction (Step by Step)
