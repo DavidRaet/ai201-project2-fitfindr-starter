@@ -63,7 +63,7 @@ def handle_query(user_query: str, wardrobe_choice: str) -> tuple[str, str, str]:
         )
     except ValueError as e:
         print(f"Invalid input: {e}")
-        return str(e), "", ""
+        return None
 
 
 # ── interface ─────────────────────────────────────────────────────────────────
