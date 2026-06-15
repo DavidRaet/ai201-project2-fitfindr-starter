@@ -18,6 +18,8 @@ Usage (once implemented):
     print(result["error"])   # None on success
 """
 
+import re
+
 from tools import search_listings, suggest_outfit, create_fit_card
 
 
@@ -43,6 +45,26 @@ def _new_session(query: str, wardrobe: dict) -> dict:
         "fit_card": None,            # string returned by create_fit_card
         "error": None,               # set if the interaction ended early
     }
+
+
+# ── query parsing ─────────────────────────────────────────────────────────────
+
+def _parse_query(query: str) -> dict:
+    """
+    Extract description, size, and max_price from a natural-language query
+    using regex. No LLM call needed — patterns cover the common cases.
+    """
+    price_match = re.search(r'under\s+\$?(\d+(?:\.\d+)?)', query, re.IGNORECASE)
+    max_price = float(price_match.group(1)) if price_match else None
+
+    size_match = re.search(r'\bsize\s+([A-Za-z0-9\/]+)', query, re.IGNORECASE)
+    size = size_match.group(1).upper() if size_match else None
+
+    desc = re.sub(r'\bunder\s+\$?\d+(?:\.\d+)?', '', query, flags=re.IGNORECASE)
+    desc = re.sub(r',?\s*\bsize\s+\S+', '', desc, flags=re.IGNORECASE)
+    description = desc.strip().strip(',').strip()
+
+    return {"description": description, "size": size, "max_price": max_price}
 
 
 # ── planning loop ─────────────────────────────────────────────────────────────
