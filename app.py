@@ -62,8 +62,9 @@ def handle_query(user_query: str, wardrobe_choice: str) -> tuple[str, str, str]:
             session_dict["fit_card"],
         )
     except ValueError as e:
-        print(f"Invalid input: {e}")
-        return None
+        error_msg = f"Invalid input: {e}"
+        print(error_msg)
+        return error_msg, "", ""  
 
 
 # ── interface ─────────────────────────────────────────────────────────────────
