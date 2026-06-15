@@ -137,8 +137,17 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     # Step 4: select top result
     session["selected_item"] = session["search_results"][0]
 
-    # TODO: Steps 5–7 — suggest_outfit and create_fit_card wired in next step
-    session["error"] = "Planning loop not yet fully implemented."
+    # Step 5: generate outfit suggestion
+    session["outfit_suggestion"] = suggest_outfit(
+        session["selected_item"], session["wardrobe"]
+    )
+
+    # Step 6: generate fit card
+    session["fit_card"] = create_fit_card(
+        session["outfit_suggestion"], session["selected_item"]
+    )
+
+    # Step 7: return completed session
     return session
 
 
