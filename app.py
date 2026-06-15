@@ -17,8 +17,8 @@ import gradio as gr
 from agent import run_agent
 from utils.data_loader import get_example_wardrobe, get_empty_wardrobe
 
-
 # ── query handler ─────────────────────────────────────────────────────────────
+
 
 def handle_query(user_query: str, wardrobe_choice: str) -> tuple[str, str, str]:
     """
@@ -44,7 +44,26 @@ def handle_query(user_query: str, wardrobe_choice: str) -> tuple[str, str, str]:
            session["fit_card"].
     """
     # TODO: implement this function
-    return "Agent not yet implemented.", "", ""
+    try:
+        if not user_query:
+            raise ValueError("Query cannot be empty")
+        # Execute query logic here
+        if wardrobe_choice == "Example wardrobe":
+            wardrobe = get_example_wardrobe()
+        else:
+            wardrobe = get_empty_wardrobe()
+        session_dict = run_agent(user_query, wardrobe)
+        if session_dict["error"]:
+            return session_dict["error"], "", ""
+        listing_text = f"{session_dict['selected_item']['title']}\n${session_dict['selected_item']['price']}\nSize: {session_dict['selected_item']['size']}\n..."
+        return (
+            listing_text,
+            session_dict["outfit_suggestion"],
+            session_dict["fit_card"],
+        )
+    except ValueError as e:
+        print(f"Invalid input: {e}")
+        return str(e), "", ""
 
 
 # ── interface ─────────────────────────────────────────────────────────────────
@@ -54,8 +73,9 @@ EXAMPLE_QUERIES = [
     "90s track jacket in size M",
     "flowy midi skirt under $40",
     "black combat boots size 8",
-    "designer ballgown size XXS under $5",   # deliberate no-results test
+    "designer ballgown size XXS under $5",  # deliberate no-results test
 ]
+
 
 def build_interface():
     with gr.Blocks(title="FitFindr") as demo:
