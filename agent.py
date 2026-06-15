@@ -142,10 +142,21 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         session["selected_item"], session["wardrobe"]
     )
 
-    # Step 6: generate fit card
-    session["fit_card"] = create_fit_card(
-        session["outfit_suggestion"], session["selected_item"]
-    )
+    # Step 6: generate fit card (with retry logic when it hits an exception)
+    max_retries = 20
+    for attempt in range(max_retries):
+        try:
+            session["fit_card"] = create_fit_card(
+                session["outfit_suggestion"], session["selected_item"]
+            )
+            break  
+        except Exception as e:
+            if attempt == max_retries - 1:
+                session["error"] = (
+                    f"Failed to generate a fit card after {max_retries} attempts. "
+                    f"Last error: {str(e)}"
+                )
+                return session
 
     # Step 7: return completed session
     return session
