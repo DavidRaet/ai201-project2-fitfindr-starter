@@ -114,9 +114,31 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     Before writing code, complete the Planning Loop and State Management sections
     of planning.md — your implementation should match what you described there.
     """
-    # TODO: implement the planning loop
+    # Step 1: initialize session
     session = _new_session(query, wardrobe)
-    session["error"] = "Planning loop not yet implemented."
+
+    # Step 2: parse query
+    session["parsed"] = _parse_query(query)
+
+    # Step 3: search listings
+    parsed = session["parsed"]
+    session["search_results"] = search_listings(
+        parsed["description"],
+        size=parsed.get("size"),
+        max_price=parsed.get("max_price"),
+    )
+    if not session["search_results"]:
+        session["error"] = (
+            "No items found matching your search. "
+            "Try different keywords, size, or price range."
+        )
+        return session
+
+    # Step 4: select top result
+    session["selected_item"] = session["search_results"][0]
+
+    # TODO: Steps 5–7 — suggest_outfit and create_fit_card wired in next step
+    session["error"] = "Planning loop not yet fully implemented."
     return session
 
 
